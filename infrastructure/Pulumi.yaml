@@ -1,0 +1,3 @@
+name: pulumi-test-app
+runtime: nodejs
+description: infrastructure for pulumi test app

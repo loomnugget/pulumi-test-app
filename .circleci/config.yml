@@ -1,0 +1,94 @@
+version: 2.1
+commands:
+  pulumi:
+    description: Run Pulumi command
+    parameters:
+      command:
+        type: string
+    steps:
+      - run:
+          command: /root/.pulumi/bin/pulumi << parameters.command >>
+          working_directory: infrastructure
+  do-deploy:
+    description: Deploy via Pulumi
+    parameters:
+      stack:
+        type: string
+        default: loomnugget/test
+    steps:
+      - checkout
+      - run: curl -fsSL https://get.pulumi.com | sh
+      - run:
+          command: yarn install
+          working_directory: infrastructure
+      - pulumi:
+          command: stack select << parameters.stack >> -c
+      - pulumi:
+          command: config set gcp:project $GOOGLE_PROJECT_NAME
+      - pulumi:
+          command: config set gcp:credentials $GOOGLE_APPLICATION_CREDENTIALS
+      - pulumi:
+          command: config set backendDockerImage us.gcr.io/${GOOGLE_PROJECT_NAME}/backend:${CIRCLE_SHA1}
+      - pulumi:
+          command: up --yes --verbose 4 --logtostderr
+  build-docker-image:
+    description: Build a docker image
+    parameters:
+      image-name:
+        type: string
+        description: the "local" name of the image
+      path:
+        type: string
+        description: the path to the docker build context
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: echo $GCP_SERVICE_ACCOUNT_CREDS_B64 | base64 -di > $GOOGLE_APPLICATION_CREDENTIALS
+      - run: gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+      - run: gcloud auth configure-docker
+      - run: docker build << parameters.path >> -t us.gcr.io/${GOOGLE_PROJECT_NAME}/<< parameters.image-name >>:${CIRCLE_SHA1}
+      - run: docker push us.gcr.io/${GOOGLE_PROJECT_NAME}/<< parameters.image-name >>:${CIRCLE_SHA1}
+jobs:
+  test-backend:
+    docker:
+      - image: circleci/ruby:2.5
+    steps:
+      - checkout
+  build-backend-image:
+    docker:
+      - image: google/cloud-sdk
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /root/gcp-credentials.json
+      GOOGLE_PROJECT_NAME: pulumi-test-app
+    steps:
+      - build-docker-image:
+          image-name: backend
+          path: backend
+  deploy:
+    docker:
+      - image: node:14
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /root/gcp-credentials.json
+      GOOGLE_PROJECT_NAME: pulumi-test-app
+    steps:
+      - run: echo $GCP_SERVICE_ACCOUNT_CREDS_B64 | base64 -di > $GOOGLE_APPLICATION_CREDENTIALS
+      - checkout
+      - do-deploy
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build-backend-image:
+          requires:
+            - test-backend
+          filters:
+            branches:
+              only:
+                - master
+      - deploy:
+          requires:
+            - build-backend-image
+          filters:
+            branches:
+              only:
+                - master

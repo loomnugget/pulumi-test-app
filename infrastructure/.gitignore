@@ -1,0 +1,4 @@
+/bin/
+/node_modules/
+gcp-credentials.json
+Pulumi.*.yaml
