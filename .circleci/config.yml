@@ -78,6 +78,7 @@ workflows:
   version: 2
   main:
     jobs:
+      - test-backend
       - build-backend-image:
           requires:
             - test-backend
