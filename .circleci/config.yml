@@ -30,8 +30,7 @@ commands:
       - pulumi:
           command: config set backendDockerImage us.gcr.io/${GOOGLE_PROJECT_NAME}/backend:${CIRCLE_SHA1}
       - pulumi:
-          # command: up --yes --verbose 4 --logtostderr
-          command: destroy -y
+          command: up --yes --verbose 4 --logtostderr
   build-docker-image:
     description: Build a docker image
     parameters:
