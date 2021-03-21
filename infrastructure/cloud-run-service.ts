@@ -55,6 +55,7 @@ export class TestCloudRunService {
     });
     const dnsName = `${args.dnsName}.`;
     const cert = new gcp.compute.ManagedSslCertificate(`${args.serviceName}-cert`, {
+      description: "ssl cert",
       managed: {
         domains: [dnsName]
       }
